@@ -15,7 +15,11 @@ import (
 func IsCIDR(cidr string) bool {
 	// This handles validation aspects
 	_, _, err := net.ParseCIDR(cidr)
-	return err == nil
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 // CIDRSubnet will return the IPMask in decimal format

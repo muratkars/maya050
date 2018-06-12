@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +24,6 @@ import (
 
 type OpenebsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	CASTemplatesGetter
-	CStorPoolsGetter
-	CStorVolumeReplicasGetter
 	StoragePoolsGetter
 	StoragePoolClaimsGetter
 }
@@ -36,24 +33,12 @@ type OpenebsV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *OpenebsV1alpha1Client) CASTemplates() CASTemplateInterface {
-	return newCASTemplates(c)
+func (c *OpenebsV1alpha1Client) StoragePools(namespace string) StoragePoolInterface {
+	return newStoragePools(c, namespace)
 }
 
-func (c *OpenebsV1alpha1Client) CStorPools() CStorPoolInterface {
-	return newCStorPools(c)
-}
-
-func (c *OpenebsV1alpha1Client) CStorVolumeReplicas() CStorVolumeReplicaInterface {
-	return newCStorVolumeReplicas(c)
-}
-
-func (c *OpenebsV1alpha1Client) StoragePools() StoragePoolInterface {
-	return newStoragePools(c)
-}
-
-func (c *OpenebsV1alpha1Client) StoragePoolClaims() StoragePoolClaimInterface {
-	return newStoragePoolClaims(c)
+func (c *OpenebsV1alpha1Client) StoragePoolClaims(namespace string) StoragePoolClaimInterface {
+	return newStoragePoolClaims(c, namespace)
 }
 
 // NewForConfig creates a new OpenebsV1alpha1Client for the given config.

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 // StoragePoolClaimsGetter has a method to return a StoragePoolClaimInterface.
 // A group's client should implement this interface.
 type StoragePoolClaimsGetter interface {
-	StoragePoolClaims() StoragePoolClaimInterface
+	StoragePoolClaims(namespace string) StoragePoolClaimInterface
 }
 
 // StoragePoolClaimInterface has methods to work with StoragePoolClaim resources.
@@ -46,12 +46,14 @@ type StoragePoolClaimInterface interface {
 // storagePoolClaims implements StoragePoolClaimInterface
 type storagePoolClaims struct {
 	client rest.Interface
+	ns     string
 }
 
 // newStoragePoolClaims returns a StoragePoolClaims
-func newStoragePoolClaims(c *OpenebsV1alpha1Client) *storagePoolClaims {
+func newStoragePoolClaims(c *OpenebsV1alpha1Client, namespace string) *storagePoolClaims {
 	return &storagePoolClaims{
 		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -59,6 +61,7 @@ func newStoragePoolClaims(c *OpenebsV1alpha1Client) *storagePoolClaims {
 func (c *storagePoolClaims) Get(name string, options v1.GetOptions) (result *v1alpha1.StoragePoolClaim, err error) {
 	result = &v1alpha1.StoragePoolClaim{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -71,6 +74,7 @@ func (c *storagePoolClaims) Get(name string, options v1.GetOptions) (result *v1a
 func (c *storagePoolClaims) List(opts v1.ListOptions) (result *v1alpha1.StoragePoolClaimList, err error) {
 	result = &v1alpha1.StoragePoolClaimList{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -82,6 +86,7 @@ func (c *storagePoolClaims) List(opts v1.ListOptions) (result *v1alpha1.StorageP
 func (c *storagePoolClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -91,6 +96,7 @@ func (c *storagePoolClaims) Watch(opts v1.ListOptions) (watch.Interface, error) 
 func (c *storagePoolClaims) Create(storagePoolClaim *v1alpha1.StoragePoolClaim) (result *v1alpha1.StoragePoolClaim, err error) {
 	result = &v1alpha1.StoragePoolClaim{}
 	err = c.client.Post().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		Body(storagePoolClaim).
 		Do().
@@ -102,6 +108,7 @@ func (c *storagePoolClaims) Create(storagePoolClaim *v1alpha1.StoragePoolClaim) 
 func (c *storagePoolClaims) Update(storagePoolClaim *v1alpha1.StoragePoolClaim) (result *v1alpha1.StoragePoolClaim, err error) {
 	result = &v1alpha1.StoragePoolClaim{}
 	err = c.client.Put().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		Name(storagePoolClaim.Name).
 		Body(storagePoolClaim).
@@ -113,6 +120,7 @@ func (c *storagePoolClaims) Update(storagePoolClaim *v1alpha1.StoragePoolClaim) 
 // Delete takes name of the storagePoolClaim and deletes it. Returns an error if one occurs.
 func (c *storagePoolClaims) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		Name(name).
 		Body(options).
@@ -123,6 +131,7 @@ func (c *storagePoolClaims) Delete(name string, options *v1.DeleteOptions) error
 // DeleteCollection deletes a collection of objects.
 func (c *storagePoolClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -134,6 +143,7 @@ func (c *storagePoolClaims) DeleteCollection(options *v1.DeleteOptions, listOpti
 func (c *storagePoolClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.StoragePoolClaim, err error) {
 	result = &v1alpha1.StoragePoolClaim{}
 	err = c.client.Patch(pt).
+		Namespace(c.ns).
 		Resource("storagepoolclaims").
 		SubResource(subresources...).
 		Name(name).

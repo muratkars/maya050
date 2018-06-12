@@ -21,7 +21,6 @@ import (
 	k8sApisExtnsBeta1 "k8s.io/api/extensions/v1beta1"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // OpenEBSImage represents an OpenEBS container image
@@ -150,57 +149,27 @@ func (p *VolumeMarkerBuilder) AddMultiples(key, value string, isMul bool) error 
 		value = string(v1.NilVV)
 	}
 
-	var m VolumeMarker
-	var isPresent bool
-	var mIndex int
-	for i, a := range p.Items {
-		if a.Key == key {
-			if !isMul {
-				return fmt.Errorf("Duplicate marker key '%s'", key)
-			}
-			m = a
-			isPresent = true
-			mIndex = i
-			break
+	for _, a := range p.Items {
+		if a.Key == key && !isMul {
+			return fmt.Errorf("Duplicate marker key '%s'", key)
 		}
 	}
 
-	if !isPresent {
-		// create a new marker if not available earlier
-		m = VolumeMarker{
-			Key:        key,
-			IsMultiple: isMul,
-		}
+	a := VolumeMarker{
+		Key:        key,
+		IsMultiple: isMul,
 	}
 
-	// Append or Set the value based on isMul flag
 	if isMul {
-		m.Values = append(m.Values, value)
+		a.Values = append(a.Values, value)
 	} else {
-		m.Value = value
+		a.Value = value
 	}
 
-	if isPresent {
-		// update as this is available already
-		p.Items[mIndex] = m
-	} else {
-		// add
-		items := append(p.Items, m)
-		p.Items = items
-	}
+	items := append(p.Items, a)
+	p.Items = items
 
 	return nil
-}
-
-// GetMarker returns the volume marker if available
-func (p *VolumeMarkerBuilder) GetMarker(key string) (VolumeMarker, bool) {
-	for _, a := range p.Items {
-		if a.Key == key {
-			return a, true
-		}
-	}
-
-	return VolumeMarker{}, false
 }
 
 // Add will add a new volume marker
@@ -256,70 +225,6 @@ func (p *VolumeMarkerBuilder) AddControllerStatuses(pod k8sApiV1.Pod) {
 
 	// new key representation
 	_ = p.AddMultiples(string(v1.JivaControllerStatusVK), status, true)
-}
-
-// AddControllerContainerStatus is to fetch state of controller containers
-func (p *VolumeMarkerBuilder) AddControllerContainerStatus(cp k8sApiV1.Pod) {
-
-	p.AddContainerStatuses(cp, v1.ControllerContainerStatusVK)
-}
-
-// AddReplicaContainerStatus is to fetch state of replica containers
-func (p *VolumeMarkerBuilder) AddReplicaContainerStatus(cp k8sApiV1.Pod) {
-
-	p.AddContainerStatuses(cp, v1.ReplicaContainerStatusVK)
-}
-
-// AddContainerStatuses is to fetch the current state of containers
-// inside the pod
-func (p *VolumeMarkerBuilder) AddContainerStatuses(cp k8sApiV1.Pod, volumekey v1.VolumeKey) {
-	for _, current := range cp.Status.ContainerStatuses {
-		value := v1.NilVV
-		if current.State.Waiting != nil {
-			value = v1.ContainerWaitingVV
-		}
-
-		if current.State.Terminated != nil {
-			value = v1.ContainerTerminatedVV
-		}
-
-		if current.State.Running != nil {
-			if current.Ready {
-				value = v1.ContainerRunningVV
-			} else {
-				value = v1.ContainerNotRunningVV
-			}
-		}
-		_ = p.AddMultiples(string(volumekey), string(value), true)
-	}
-}
-
-// IsVolumeRunning to compare the state of all containers in a pod
-func (p *VolumeMarkerBuilder) IsVolumeRunning(pv *v1.Volume) bool {
-	var cphase, rphase v1.VolumeValue
-	cstate := pv.Annotations[string(v1.ControllerContainerStatusVK)]
-	cresult := strings.Split(cstate, ",")
-
-	for i := range cresult {
-		if cresult[i] == string(v1.ContainerRunningVV) {
-			cphase = v1.ContainerRunningVV
-		} else {
-			cphase = v1.ContainerNotRunningVV
-		}
-
-	}
-	rstate := pv.Annotations[string(v1.ReplicaContainerStatusVK)]
-	rresult := strings.Split(rstate, ",")
-
-	for i := range rresult {
-		if rresult[i] == string(v1.ContainerRunningVV) {
-			rphase = v1.ContainerRunningVV
-		} else {
-			rphase = v1.ContainerNotRunningVV
-		}
-	}
-
-	return cphase == v1.ContainerRunningVV && rphase == v1.ContainerRunningVV
 }
 
 //
@@ -500,7 +405,7 @@ var monSideCarTpl = k8sApiV1.Container{
 	Name:  "maya-volume-exporter",
 	Image: v1.DefaultMonitoringImage,
 	Command: []string{
-		"maya-exporter",
+		"maya-volume-exporter",
 	},
 	Args: []string{
 		"-c=http://__TARGET_IP__:9501",
@@ -634,14 +539,6 @@ type K8sClientV2 interface {
 	// NOTE:
 	//  StoragePool is a K8s CRD resource
 	StoragePoolOps() (oe_client_v1alpha1.StoragePoolInterface, error)
-
-	// NamespaceOps provides a NamespaceInterface that exposes
-	// various CRUD operations w.r.t Namespace
-	NamespaceOps() (k8sCoreV1.NamespaceInterface, error)
-
-	// DeploymentOps2 provides all the CRUD operations associated
-	// w.r.t a Deployment
-	DeploymentOps2() (k8sExtnsV1Beta1.DeploymentInterface, error)
 }
 
 // k8sUtil provides the concrete implementation for below interfaces:
@@ -806,7 +703,7 @@ func (k *k8sUtil) Services() (k8sCoreV1.ServiceInterface, error) {
 	return cs.CoreV1().Services(ns), nil
 }
 
-// DeploymentOps is a utility function that provides a instance capable of
+// Services is a utility function that provides a instance capable of
 // executing various k8s Deployment related operations.
 func (k *k8sUtil) DeploymentOps() (k8sExtnsV1Beta1.DeploymentInterface, error) {
 	var cs *kubernetes.Clientset
@@ -832,33 +729,6 @@ func (k *k8sUtil) DeploymentOps() (k8sExtnsV1Beta1.DeploymentInterface, error) {
 	}
 
 	return cs.ExtensionsV1beta1().Deployments(ns), nil
-}
-
-// DeploymentOps2 is a utility function that provides a instance capable of
-// executing various k8s Deployment related operations.
-func (k *k8sUtil) DeploymentOps2() (k8sExtnsV1Beta1.DeploymentInterface, error) {
-	cs, err := k.getClientSet()
-	if err != nil {
-		return nil, err
-	}
-
-	// error out if still empty
-	if len(k.volume.Namespace) == 0 {
-		return nil, fmt.Errorf("Nil namespace")
-	}
-
-	return cs.ExtensionsV1beta1().Deployments(k.volume.Namespace), nil
-}
-
-//  NamespaceOps provides the NamespaceInterface object that exposes
-// various CRUD operations
-func (k *k8sUtil) NamespaceOps() (k8sCoreV1.NamespaceInterface, error) {
-	cs, err := k.getClientSet()
-	if err != nil {
-		return nil, err
-	}
-
-	return cs.CoreV1().Namespaces(), nil
 }
 
 // PVCOps gets a PVCInterface that exposes various CRUD operations
@@ -958,7 +828,12 @@ func (k *k8sUtil) StoragePoolOps() (oe_client_v1alpha1.StoragePoolInterface, err
 		return nil, err
 	}
 
-	return mcs.OpenebsV1alpha1().StoragePools(), nil
+	// error out if still empty
+	if len(k.volume.Namespace) == 0 {
+		return nil, fmt.Errorf("Nil namespace")
+	}
+
+	return mcs.OpenebsV1alpha1().StoragePools(k.volume.Namespace), nil
 }
 
 // getClientSet is used to get a new http client capable
@@ -1038,29 +913,18 @@ func (k *k8sUtil) getOEClientSet() (*versioned.Clientset, error) {
 	return cs, nil
 }
 
-func getK8sConfig() (config *rest.Config, err error) {
-	k8sMaster := v1.K8sMasterENV()
-	kubeConfig := v1.KubeConfigENV()
-
-	if len(k8sMaster) != 0 || len(kubeConfig) != 0 {
-		// creates the config from k8sMaster or kubeConfig
-		return clientcmd.BuildConfigFromFlags(k8sMaster, kubeConfig)
-	}
-
-	// creates the in-cluster config making use of the Pod's ENV & secrets
-	return rest.InClusterConfig()
-}
-
 // getInClusterCS is used to initialize and return a new http client capable
 // of invoking K8s APIs.
-func (k *k8sUtil) getInClusterCS() (clientset *kubernetes.Clientset, err error) {
-	config, err := getK8sConfig()
+func (k *k8sUtil) getInClusterCS() (*kubernetes.Clientset, error) {
+
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	// creates the in-cluster clientset
-	clientset, err = kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -1070,14 +934,16 @@ func (k *k8sUtil) getInClusterCS() (clientset *kubernetes.Clientset, err error) 
 
 // getInClusterOECS is used to initialize and return a new http client capable
 // of invoking OpenEBS CRD APIs.
-func (k *k8sUtil) getInClusterOECS() (clientset *versioned.Clientset, err error) {
-	config, err := getK8sConfig()
+func (k *k8sUtil) getInClusterOECS() (*versioned.Clientset, error) {
+
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	// creates the in-cluster OE clientset
-	clientset, err = versioned.NewForConfig(config)
+	clientset, err := versioned.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

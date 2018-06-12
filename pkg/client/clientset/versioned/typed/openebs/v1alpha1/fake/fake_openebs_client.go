@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,24 +25,12 @@ type FakeOpenebsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeOpenebsV1alpha1) CASTemplates() v1alpha1.CASTemplateInterface {
-	return &FakeCASTemplates{c}
+func (c *FakeOpenebsV1alpha1) StoragePools(namespace string) v1alpha1.StoragePoolInterface {
+	return &FakeStoragePools{c, namespace}
 }
 
-func (c *FakeOpenebsV1alpha1) CStorPools() v1alpha1.CStorPoolInterface {
-	return &FakeCStorPools{c}
-}
-
-func (c *FakeOpenebsV1alpha1) CStorVolumeReplicas() v1alpha1.CStorVolumeReplicaInterface {
-	return &FakeCStorVolumeReplicas{c}
-}
-
-func (c *FakeOpenebsV1alpha1) StoragePools() v1alpha1.StoragePoolInterface {
-	return &FakeStoragePools{c}
-}
-
-func (c *FakeOpenebsV1alpha1) StoragePoolClaims() v1alpha1.StoragePoolClaimInterface {
-	return &FakeStoragePoolClaims{c}
+func (c *FakeOpenebsV1alpha1) StoragePoolClaims(namespace string) v1alpha1.StoragePoolClaimInterface {
+	return &FakeStoragePoolClaims{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

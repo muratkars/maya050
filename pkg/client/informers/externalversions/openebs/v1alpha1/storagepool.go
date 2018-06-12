@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,14 +44,14 @@ type storagePoolInformer struct {
 // NewStoragePoolInformer constructs a new informer for StoragePool type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStoragePoolInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+func NewStoragePoolInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.OpenebsV1alpha1().StoragePools().List(options)
+				return client.OpenebsV1alpha1().StoragePools(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.OpenebsV1alpha1().StoragePools().Watch(options)
+				return client.OpenebsV1alpha1().StoragePools(namespace).Watch(options)
 			},
 		},
 		&openebs_io_v1alpha1.StoragePool{},
@@ -61,7 +61,7 @@ func NewStoragePoolInformer(client versioned.Interface, resyncPeriod time.Durati
 }
 
 func defaultStoragePoolInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewStoragePoolInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return NewStoragePoolInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *storagePoolInformer) Informer() cache.SharedIndexInformer {

@@ -17,54 +17,29 @@ limitations under the License.
 package command
 
 import (
-	"flag"
-
 	"github.com/spf13/cobra"
 )
 
 var (
 	volumeCommandHelpText = `
-The following commands helps in operating a Volume such as create, list, and so on.
+	Usage: maya volume <subcommand> [options] [args]
 
-Usage: mayactl volume <subcommand> [options] [args]
+	This command provides operations related to a Volume.
 
-Examples:
+	Create a Volume:
+	$ maya volume create -volname <vol> -size <size>
 
- # Create a Volume:
-   $ mayactl volume create --volname <vol> --size <size>
+	List Volumes:
+	$ maya volume list
 
- # List Volumes:
-   $ mayactl volume list
+	Delete a Volume:
+	$ maya volume delete -volname <vol>
 
- # Delete a Volume:
-   $ mayactl volume delete --volname <vol>
+	Statistics of a Volume:
+	$ maya volume stats <vol>
 
- # Delete a Volume created in 'test' namespace:
-   $ mayactl volume delete --volname <vol> --namespace test
-
- # Statistics of a Volume:
-   $ mayactl volume stats --volname <vol>
-
- # Statistics of a Volume created in 'test' namespace:
-   $ mayactl volume stats --volname <vol> --namespace test
-
- # Info of a Volume:
-   $ mayactl volume info --volname <vol>
-
- # Info of a Volume created in 'test' namespace:
-   $ mayactl volume info --volname <vol> --namespace test
-`
-	options = &CmdVolumeOptions{
-		namespace: "default",
-	}
+	`
 )
-
-type CmdVolumeOptions struct {
-	volName   string
-	size      string
-	namespace string
-	json      string
-}
 
 // NewCmdVolume provides options for managing OpenEBS Volume
 func NewCmdVolume() *cobra.Command {
@@ -78,13 +53,6 @@ func NewCmdVolume() *cobra.Command {
 		NewCmdVolumeCreate(),
 		NewCmdVolumesList(),
 		NewCmdVolumeDelete(),
-		NewCmdVolumeStats(),
-		NewCmdVolumeInfo(),
 	)
-	cmd.PersistentFlags().StringVarP(&options.namespace, "namespace", "n", options.namespace,
-		"namespace name, required if volume is not in the default namespace")
-
-	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	flag.CommandLine.Parse([]string{})
 	return cmd
 }

@@ -220,24 +220,12 @@ func (k *k8sOrchestrator) SPPolicies() (oe_api_v1alpha1.StoragePoolSpec, error) 
 		return oe_api_v1alpha1.StoragePoolSpec{}, err
 	}
 
-	// get StoragePool using a list
-	// this is done to separate `not found` from an `actual error`
-	splist, err := spOps.List(metav1.ListOptions{})
+	sp, err := spOps.Get(k.volume.StoragePool, metav1.GetOptions{})
 	if err != nil {
 		return oe_api_v1alpha1.StoragePoolSpec{}, err
 	}
 
-	for _, sp := range splist.Items {
-		if sp.Name == k.volume.StoragePool {
-			// SP policies is the spec associated with the SP
-			return sp.Spec, nil
-		}
-	}
-
-	// the storage pool was not found, return blank specs
-	// NOTE: If a SP is not found then empty spec is returned & not
-	// an error
-	return oe_api_v1alpha1.StoragePoolSpec{}, nil
+	return sp.Spec, nil
 }
 
 // PVCPolicies will fetch volume policies based on the PVC
@@ -352,12 +340,8 @@ func (k *k8sOrchestrator) DeleteStorage(volProProfile volProfile.VolumeProvision
 		return false, err
 	}
 
-	rDeploys, err := k.getReplicaDeploys(vsm, dOps)
-	if err != nil {
-		return false, err
-	}
-
-	cDeploys, err := k.getControllerDeploys(vsm, dOps)
+	// fetch k8s Pod operations
+	pOps, err := kc.Pods()
 	if err != nil {
 		return false, err
 	}
@@ -368,20 +352,20 @@ func (k *k8sOrchestrator) DeleteStorage(volProProfile volProfile.VolumeProvision
 		return false, err
 	}
 
-	cSvcs, err := k.getControllerServices(vsm, sOps)
+	// This ensures the dependents of Deployment e.g. ReplicaSets to be deleted
+	orphanDependents := false
+
+	// Delete the Replica Deployments first
+	rDeploys, err := k.getReplicaDeploys(vsm, dOps)
 	if err != nil {
 		return false, err
 	}
 
-	// This ensures the dependents of Deployment e.g. ReplicaSets to be deleted
-	deletePropagation := metav1.DeletePropagationForeground
-
-	// Delete the Replica Deployments first
 	if rDeploys != nil && len(rDeploys.Items) > 0 {
 		hasAtleastOneVSMObj = true
 		for _, rd := range rDeploys.Items {
 			err = dOps.Delete(rd.Name, &metav1.DeleteOptions{
-				PropagationPolicy: &deletePropagation,
+				OrphanDependents: &orphanDependents,
 			})
 			if err != nil {
 				return false, err
@@ -390,11 +374,52 @@ func (k *k8sOrchestrator) DeleteStorage(volProProfile volProfile.VolumeProvision
 	}
 
 	// Delete the Controller Deployments next
+	cDeploys, err := k.getControllerDeploys(vsm, dOps)
+	if err != nil {
+		return false, err
+	}
+
 	if cDeploys != nil && len(cDeploys.Items) > 0 {
 		hasAtleastOneVSMObj = true
 		for _, cd := range cDeploys.Items {
 			err = dOps.Delete(cd.Name, &metav1.DeleteOptions{
-				PropagationPolicy: &deletePropagation,
+				OrphanDependents: &orphanDependents,
+			})
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	// Delete the Replica Pods before Controller Pod(s)
+	rPods, err := k.getReplicaPods(vsm, pOps)
+	if err != nil {
+		return false, err
+	}
+
+	if rPods != nil && len(rPods.Items) > 0 {
+		hasAtleastOneVSMObj = true
+		for _, rPod := range rPods.Items {
+			err = pOps.Delete(rPod.Name, &metav1.DeleteOptions{
+				OrphanDependents: &orphanDependents,
+			})
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	// Delete the Controller Pods next
+	cPods, err := k.getControllerPods(vsm, pOps)
+	if err != nil {
+		return false, err
+	}
+
+	if cPods != nil && len(cPods.Items) > 0 {
+		hasAtleastOneVSMObj = true
+		for _, cPod := range cPods.Items {
+			err = pOps.Delete(cPod.Name, &metav1.DeleteOptions{
+				OrphanDependents: &orphanDependents,
 			})
 			if err != nil {
 				return false, err
@@ -403,11 +428,16 @@ func (k *k8sOrchestrator) DeleteStorage(volProProfile volProfile.VolumeProvision
 	}
 
 	// Delete the Controller Services at last
+	cSvcs, err := k.getControllerServices(vsm, sOps)
+	if err != nil {
+		return false, err
+	}
+
 	if cSvcs != nil && len(cSvcs.Items) > 0 {
 		hasAtleastOneVSMObj = true
 		for _, cSvc := range cSvcs.Items {
 			err = sOps.Delete(cSvc.Name, &metav1.DeleteOptions{
-				PropagationPolicy: &deletePropagation,
+				OrphanDependents: &orphanDependents,
 			})
 			if err != nil {
 				return false, err
@@ -426,14 +456,14 @@ func (k *k8sOrchestrator) DeleteStorage(volProProfile volProfile.VolumeProvision
 // ReadStorage will fetch information about the persistent volume
 //func (k *k8sOrchestrator) ReadStorage(volProProfile volProfile.VolumeProvisionerProfile) (*v1.PersistentVolumeList, error) {
 func (k *k8sOrchestrator) ReadStorage(volProProfile volProfile.VolumeProvisionerProfile) (*v1.Volume, error) {
-	// volProProfile is expected to have the Volume name
+	// volProProfile is expected to have the VSM name
 	return k.readVSM("", volProProfile)
 }
 
-// readVSM will fetch information about a Volume
+// readVSM will fetch information about a VSM
 func (k *k8sOrchestrator) readVSM(vsm string, volProProfile volProfile.VolumeProvisionerProfile) (*v1.Volume, error) {
 
-	// flag that checks if at-least one child object of Volume exists
+	// flag that checks if at-least one child object of VSM exists
 	doesExist := false
 
 	if volProProfile == nil {
@@ -534,7 +564,6 @@ func (k *k8sOrchestrator) readVSM(vsm string, volProProfile volProfile.VolumePro
 		for _, cp := range cPods.Items {
 			mb.AddControllerIPs(cp)
 			mb.AddControllerStatuses(cp)
-			mb.AddControllerContainerStatus(cp)
 		}
 	} else {
 		glog.Warningf("Missing Controller Pod(s) for volume '%s: %s'", ns, vsm)
@@ -551,7 +580,6 @@ func (k *k8sOrchestrator) readVSM(vsm string, volProProfile volProfile.VolumePro
 		for _, rp := range rPods.Items {
 			mb.AddReplicaIPs(rp)
 			mb.AddReplicaStatuses(rp)
-			mb.AddReplicaContainerStatus(rp)
 		}
 	} else {
 		glog.Warningf("Missing Replica Pod(s) for volume '%s: %s'", ns, vsm)
@@ -586,76 +614,25 @@ func (k *k8sOrchestrator) readVSM(vsm string, volProProfile volProfile.VolumePro
 	pv.Name = vsm
 	pv.Annotations = mb.AsAnnotations()
 
-	if mb.IsVolumeRunning(pv) {
-		pv.Status.Phase = v1.VolumePhase(v1.VolumeRunningVV)
-	} else {
-		pv.Status.Phase = v1.VolumePhase(v1.VolumeNotRunningVV)
-	}
-
 	glog.Infof("Info fetched successfully for volume '%s: %s'", ns, vsm)
 
 	return pv, nil
 }
 
-// getAllNamespaces will get all the available namespaces
-// in K8s cluster
-func (k *k8sOrchestrator) getAllNamespaces(vol *v1.Volume) ([]string, error) {
-
-	ku := &k8sUtil{
-		volume: vol,
+// ListStorage will list a collections of VSMs
+func (k *k8sOrchestrator) ListStorage(volProProfile volProfile.VolumeProvisionerProfile) (*v1.VolumeList, error) {
+	if volProProfile == nil {
+		return nil, fmt.Errorf("Nil volume provisioner profile provided")
 	}
 
-	kc, supported, err := ku.K8sClientV2()
+	glog.Infof("Listing VSMs at orchestrator '%s: %s'", k.Label(), k.Name())
+
+	dl, err := k.getVSMDeployments(volProProfile)
 	if err != nil {
 		return nil, err
 	}
 
-	if !supported {
-		return nil, fmt.Errorf("K8s client is not supported")
-	}
-
-	nsOps, err := kc.NamespaceOps()
-	if err != nil {
-		return nil, err
-	}
-
-	nsl, err := nsOps.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	var nss []string
-	for _, ns := range nsl.Items {
-		nss = append(nss, ns.Name)
-	}
-
-	return nss, nil
-}
-
-// listStorageByNS will list a collections of volumes for a
-// particular namespace
-func (k *k8sOrchestrator) listStorageByNS(vol *v1.Volume) (*v1.VolumeList, error) {
-	glog.Infof("Listing volumes for namespace '%s'", vol.Namespace)
-
-	vpp, err := volProfile.GetVolProProfile(vol)
-	if err != nil {
-		return nil, err
-	}
-
-	// Need to use a new version of k8sUtil as the volume
-	// it composes determines the namespace to be used
-	// for K8s list operation
-	//
-	// Note: Here volume acts as a placeholder for namespace &
-	// doesnot necessarily represent a volume
-	dl, err := k.getVSMDeployments(&k8sUtil{
-		volume: vol,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if dl == nil || len(dl.Items) == 0 {
+	if dl == nil || dl.Items == nil || len(dl.Items) == 0 {
 		return nil, nil
 	}
 
@@ -671,69 +648,19 @@ func (k *k8sOrchestrator) listStorageByNS(vol *v1.Volume) (*v1.VolumeList, error
 
 		vsm := v1.SanitiseVSMName(d.Name)
 		if vsm == "" {
-			return nil, fmt.Errorf("Volume name could not be determined from K8s Deployment '%s'", d.Name)
+			return nil, fmt.Errorf("VSM name could not be determined from K8s Deployment 'name: %s'", d.Name)
 		}
 
-		pv, _ := k.readVSM(vsm, vpp)
-		if pv == nil {
-			// Ignore the cases where this particular VSM might be in
-			// a creating or deleting state
+		pv, err := k.readVSM(vsm, volProProfile)
+		if err != nil {
+			// Ignore the error of this particular VSM
+			// Cases where this particular VSM might be in a creating or deleting state
 			continue
 		}
-
 		pvl.Items = append(pvl.Items, *pv)
 	}
 
-	glog.Infof("Listed volumes with count '%d' for namespace '%s'", len(pvl.Items), vol.Namespace)
-
-	return pvl, nil
-}
-
-// ListStorage will list a collections of VSMs
-func (k *k8sOrchestrator) ListStorage(volProProfile volProfile.VolumeProvisionerProfile) (*v1.VolumeList, error) {
-	if volProProfile == nil {
-		return nil, fmt.Errorf("Nil volume provisioner profile provided")
-	}
-
-	vol, err := volProProfile.Volume()
-	if err != nil {
-		return nil, err
-	}
-
-	var nss []string
-	if vol.Namespace == v1.DefaultNamespaceForListOps {
-		nss, err = k.getAllNamespaces(vol)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// This will be nil if the list operation is desired
-	// for a specific namespace
-	if nss == nil {
-		return k.listStorageByNS(vol)
-	}
-
-	pvl := &v1.VolumeList{}
-	// We take a copy to avoid mutating the original
-	// volume
-	volCpy := &v1.Volume{}
-	volCpy = vol
-	for _, ns := range nss {
-		// This is most important step
-		// Listing will be done based on namespace
-		volCpy.Namespace = ns
-		l, err := k.listStorageByNS(volCpy)
-		if err != nil {
-			return nil, err
-		}
-
-		if l == nil || len(l.Items) == 0 {
-			continue
-		}
-
-		pvl.Items = append(pvl.Items, l.Items...)
-	}
+	glog.Infof("Listed VSMs 'count: %d' at orchestrator '%s: %s'", len(pvl.Items), k.Label(), k.Name())
 
 	return pvl, nil
 }
@@ -801,7 +728,7 @@ func (k *k8sOrchestrator) createControllerDeployment(volProProfile volProfile.Vo
 	}
 
 	if clusterIP == "" {
-		return nil, fmt.Errorf("Volume cluster IP is required to create controller for volume 'name: %s'", vsm)
+		return nil, fmt.Errorf("VSM cluster IP is required to create controller for vsm 'name: %s'", vsm)
 	}
 
 	cImg, imgSupport, err := volProProfile.ControllerImage()
@@ -810,7 +737,7 @@ func (k *k8sOrchestrator) createControllerDeployment(volProProfile volProfile.Vo
 	}
 
 	if !imgSupport {
-		return nil, fmt.Errorf("Volume '%s' requires a controller container image", vsm)
+		return nil, fmt.Errorf("VSM '%s' requires a controller container image", vsm)
 	}
 
 	k8sUtl := k8sOrchUtil(k, volProProfile)
@@ -827,7 +754,7 @@ func (k *k8sOrchestrator) createControllerDeployment(volProProfile volProfile.Vo
 		return nil, err
 	}
 
-	glog.Infof("Adding controller for volume 'name: %s'", vsm)
+	glog.Infof("Adding controller for VSM 'name: %s'", vsm)
 	var tolerationSeconds int64 = 0
 
 	deploy := &k8sApisExtnsBeta1.Deployment{
@@ -953,7 +880,7 @@ func (k *k8sOrchestrator) createReplicaDeployment(volProProfile volProfile.Volum
 	}
 
 	if clusterIP == "" {
-		return nil, fmt.Errorf("Volume cluster IP is required to create replica(s) for Volume 'name: %s'", vsm)
+		return nil, fmt.Errorf("VSM cluster IP is required to create replica(s) for vsm 'name: %s'", vsm)
 	}
 
 	rImg, err := volProProfile.ReplicaImage()
@@ -997,7 +924,7 @@ func (k *k8sOrchestrator) createReplicaDeployment(volProProfile volProfile.Volum
 	//for rcIndex := 1; rcIndex <= rCount; rcIndex++ {
 	//glog.Infof("Adding replica #%d for VSM '%s'", rcIndex, vsm)
 
-	glog.Infof("Adding replica(s) for Volume '%s'", vsm)
+	glog.Infof("Adding replica(s) for VSM '%s'", vsm)
 
 	deploy := &k8sApisExtnsBeta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1145,7 +1072,7 @@ func (k *k8sOrchestrator) createReplicaDeployment(volProProfile volProfile.Volum
 		return nil, err
 	}
 
-	glog.Infof("Successfully added replica(s) 'count: %d' for Volume '%s'", *rCount, d.Name)
+	glog.Infof("Successfully added replica(s) 'count: %d' for VSM '%s'", rCount, d.Name)
 
 	//glog.Infof("Successfully added replica #%d for VSM '%s'", rcIndex, d.Name)
 	//} -- end of for loop -- if manual replica addition
@@ -1456,25 +1383,23 @@ func (k *k8sOrchestrator) getDeploymentList(vsm string, volProProfile volProfile
 	}
 
 	if deployList == nil {
-		return nil, fmt.Errorf("Volume(s) '%s:%s' not found at orchestrator '%s:%s'", ns, vsm, k.Label(), k.Name())
+		return nil, fmt.Errorf("VSM(s) '%s:%s' not found at orchestrator '%s:%s'", ns, vsm, k.Label(), k.Name())
 	}
 
 	return deployList, nil
 }
 
 // getVSMDeployments fetches all the VSM deployments
-func (k *k8sOrchestrator) getVSMDeployments(ku *k8sUtil) (*k8sApisExtnsBeta1.DeploymentList, error) {
+func (k *k8sOrchestrator) getVSMDeployments(volProProfile volProfile.VolumeProvisionerProfile) (*k8sApisExtnsBeta1.DeploymentList, error) {
 
-	kc, supported, err := ku.K8sClientV2()
-	if err != nil {
-		return nil, err
-	}
+	k8sUtl := k8sOrchUtil(k, volProProfile)
 
+	kc, supported := k8sUtl.K8sClient()
 	if !supported {
-		return nil, fmt.Errorf("K8s client is not supported")
+		return nil, fmt.Errorf("K8s client not supported by '%s'", k8sUtl.Name())
 	}
 
-	dOps, err := kc.DeploymentOps2()
+	dOps, err := kc.DeploymentOps()
 	if err != nil {
 		return nil, err
 	}
@@ -1499,10 +1424,13 @@ func (k *k8sOrchestrator) getVSMDeployments(ku *k8sUtil) (*k8sApisExtnsBeta1.Dep
 }
 
 // getVSMServices fetches all the VSM services
-func (k *k8sOrchestrator) getVSMServices(k8sUtil *k8sUtil) (*k8sApiV1.ServiceList, error) {
-	kc, supported := k8sUtil.K8sClient()
+func (k *k8sOrchestrator) getVSMServices(volProProfile volProfile.VolumeProvisionerProfile) (*k8sApiV1.ServiceList, error) {
+
+	k8sUtl := k8sOrchUtil(k, volProProfile)
+
+	kc, supported := k8sUtl.K8sClient()
 	if !supported {
-		return nil, fmt.Errorf("K8s client not supported by '%s'", k8sUtil.Name())
+		return nil, fmt.Errorf("K8s client not supported by '%s'", k8sUtl.Name())
 	}
 
 	sOps, err := kc.Services()

@@ -37,12 +37,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StoragePoolClaimList{},
 		&StoragePool{},
 		&StoragePoolList{},
-		&CStorPool{},
-		&CStorPoolList{},
-		&CStorVolumeReplica{},
-		&CStorVolumeReplicaList{},
-		&CASTemplate{},
-		&CASTemplateList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

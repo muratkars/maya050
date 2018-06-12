@@ -64,7 +64,7 @@ do
             -X github.com/openebs/maya/pkg/version.Version=${VERSION} \
             -X github.com/openebs/maya/pkg/version.VersionMeta=${VERSION_META}"\
             -o $output_name\
-           ./cmd/maya-exporter
+           ./cmd/maya-volume-exporter
     done
 done
 

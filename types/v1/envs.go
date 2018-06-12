@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO
-// Deprecate this file & use instead pkg/util/env.go
 package v1
 
 import (
@@ -83,12 +81,6 @@ const (
 
 	// MonitorImageENVK is the ENV key to fetch the volume monitoring image
 	MonitorImageENVK ENVKey = "OPENEBS_IO_VOLUME_MONITOR_IMAGE"
-
-	// KubeConfigENVK is the ENV key to fetch the kubeconfig
-	KubeConfigENVK ENVKey = "OPENEBS_IO_KUBE_CONFIG"
-
-	// K8sMasterENVK is the ENV key to fetch the K8s Master's Address
-	K8sMasterENVK ENVKey = "OPENEBS_IO_K8S_MASTER"
 )
 
 // ENVKeyToDefaults maps the ENV keys to corresponding default
@@ -164,16 +156,6 @@ func HostPathENV() string {
 
 func MonitorENV() string {
 	val := GetEnv(MonitorENVK)
-	return val
-}
-
-func KubeConfigENV() string {
-	val := GetEnv(KubeConfigENVK)
-	return val
-}
-
-func K8sMasterENV() string {
-	val := GetEnv(K8sMasterENVK)
 	return val
 }
 

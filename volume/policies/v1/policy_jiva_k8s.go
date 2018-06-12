@@ -30,6 +30,7 @@ package v1
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	oe_api_v1alpha1 "github.com/openebs/maya/pkg/apis/openebs.io/v1alpha1"
 	"github.com/openebs/maya/pkg/util"
 	"github.com/openebs/maya/types/v1"
@@ -240,22 +241,21 @@ func enforceHostPath(p *JivaK8sPolicies) error {
 		return nil
 	}
 
-	// get storagepool
+	// merge from sc policy otherwise
 	err := p.getSPPolicies()
 	if err != nil {
-		return err
+		// error out if this is not default SP CRD object
+		// we relax the rules if default SP CRD object is
+		// not available
+		if p.volume.StoragePool != v1.DefaultStoragePool {
+			return err
+		}
+		// warn & proceed
+		glog.Warningf(err.Error())
 	}
-
-	// path might still be blank if the storagepool
-	// is not found in cluster
 	p.volume.HostPath = p.spSpec.Path
 
-	// err for specific storagepool, do not err for default storagepool
-	if len(p.volume.HostPath) == 0 && p.volume.StoragePool != v1.DefaultStoragePool {
-		return fmt.Errorf("StoragePool '%s' is not found", p.volume.StoragePool)
-	}
-
-	// merge if empty from env variable & then from default
+	// merge from env variable & then from default
 	hps := []string{
 		v1.HostPathENV(),
 		v1.DefaultHostPath,
@@ -268,8 +268,6 @@ func enforceHostPath(p *JivaK8sPolicies) error {
 		}
 	}
 
-	// Need to err at this place as all attempts to
-	// fetch the host path has failed
 	if len(p.volume.HostPath) == 0 {
 		return fmt.Errorf("Nil host path")
 	}

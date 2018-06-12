@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/openebs/maya/pkg/util"
 )
 
 // NewReplicaClient create the new replica client
@@ -41,11 +39,16 @@ func NewReplicaClient(address string) (*ReplicaClient, error) {
 	}
 	syncAgent := strings.Replace(address, fmt.Sprintf(":%d", port), fmt.Sprintf(":%d", port+2), -1)
 
+	timeout := time.Duration(2 * time.Second)
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
 	return &ReplicaClient{
 		Host:       parts[0],
 		Address:    address,
 		SyncAgent:  syncAgent,
-		httpClient: &http.Client{Timeout: 2 * time.Second},
+		httpClient: client,
 	}, nil
 }
 
@@ -114,30 +117,4 @@ func (c *ReplicaClient) MarkDiskAsRemoved(disk string) error {
 	return c.Post(url, &MarkDiskAsRemovedInput{
 		Name: disk,
 	}, nil)
-}
-
-// GetStatus is the helper function for mayactl.It is used to get the response of
-// the replica created in json format and then the response is then decoded to
-// the desired structure.
-func (c *ReplicaClient) GetVolumeStats(address string, obj interface{}) (int, error) {
-	replica, err := NewReplicaClient(address)
-	if err != nil {
-		return -1, err
-	}
-	url := replica.Address + "/stats"
-	resp, err := replica.httpClient.Get(url)
-	if resp != nil {
-		if resp.StatusCode == 500 {
-			return 500, util.InternalServerError
-		} else if resp.StatusCode == 503 {
-			return 503, util.ServerUnavailable
-		}
-	} else {
-		return -1, util.ServerNotReachable
-	}
-	if err != nil {
-		return -1, err
-	}
-	defer resp.Body.Close()
-	return 0, json.NewDecoder(resp.Body).Decode(obj)
 }

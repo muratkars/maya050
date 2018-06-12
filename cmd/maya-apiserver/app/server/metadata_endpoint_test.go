@@ -2,12 +2,11 @@ package server
 
 import (
 	"bytes"
+	"github.com/ugorji/go/codec"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/ugorji/go/codec"
 )
 
 /*var (
@@ -271,7 +270,7 @@ func TestMetaAvailZoneViaWrap(t *testing.T) {
 
 	// compare
 	if !bytes.Equal(expected.Bytes(), actual) {
-		t.Fatalf("bad:\nexpected:\t%q\n\nactual:\t\t%q", expected.String(), string(actual))
+		t.Fatalf("bad:\nexpected:\t%q\n\nactual:\t\t%q", string(expected.Bytes()), string(actual))
 	}
 }
 
@@ -364,7 +363,7 @@ func TestMetaInstanceIDViaWrap(t *testing.T) {
 
 	// compare
 	if !bytes.Equal(expected.Bytes(), actual) {
-		t.Fatalf("bad:\nexpected:\t%q\n\nactual:\t\t%q", expected.String(), string(actual))
+		t.Fatalf("bad:\nexpected:\t%q\n\nactual:\t\t%q", string(expected.Bytes()), string(actual))
 	}
 }
 

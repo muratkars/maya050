@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,22 +18,18 @@ limitations under the License.
 
 package v1alpha1
 
-// CASTemplateListerExpansion allows custom methods to be added to
-// CASTemplateLister.
-type CASTemplateListerExpansion interface{}
-
-// CStorPoolListerExpansion allows custom methods to be added to
-// CStorPoolLister.
-type CStorPoolListerExpansion interface{}
-
-// CStorVolumeReplicaListerExpansion allows custom methods to be added to
-// CStorVolumeReplicaLister.
-type CStorVolumeReplicaListerExpansion interface{}
-
 // StoragePoolListerExpansion allows custom methods to be added to
 // StoragePoolLister.
 type StoragePoolListerExpansion interface{}
 
+// StoragePoolNamespaceListerExpansion allows custom methods to be added to
+// StoragePoolNamespaceLister.
+type StoragePoolNamespaceListerExpansion interface{}
+
 // StoragePoolClaimListerExpansion allows custom methods to be added to
 // StoragePoolClaimLister.
 type StoragePoolClaimListerExpansion interface{}
+
+// StoragePoolClaimNamespaceListerExpansion allows custom methods to be added to
+// StoragePoolClaimNamespaceLister.
+type StoragePoolClaimNamespaceListerExpansion interface{}

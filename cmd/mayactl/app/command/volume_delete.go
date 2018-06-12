@@ -17,6 +17,7 @@ limitations under the License.
 package command
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/openebs/maya/pkg/client/mapiserver"
@@ -26,20 +27,28 @@ import (
 
 var (
 	volumeDeleteCommandHelpText = `
-This command initiates a deletion process for an OpenEBS Volume.
+	Usage: maya volume delete -volname <vol> 
 
-Usage: mayactl volume delete --volname <vol>
-`
+	This command initiate a delete for OpenEBS Volume.
+
+	`
 )
+
+// CmdVolumeDeleteOptions stores the input parameters
+type CmdVolumeDeleteOptions struct {
+	volName string
+}
 
 // NewCmdVolumeDelete creates a new OpenEBS Volume
 func NewCmdVolumeDelete() *cobra.Command {
+	options := CmdVolumeDeleteOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Deletes a Volume",
 		Long:  volumeDeleteCommandHelpText,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(options.Validate(cmd), util.Fatal)
+			util.CheckErr(options.ValidateVolumeDelete(cmd), util.Fatal)
 			util.CheckErr(options.RunVolumeDelete(cmd), util.Fatal)
 		},
 	}
@@ -47,16 +56,25 @@ func NewCmdVolumeDelete() *cobra.Command {
 	cmd.Flags().StringVarP(&options.volName, "volname", "", options.volName,
 		"unique volume name.")
 	cmd.MarkPersistentFlagRequired("volname")
+
 	return cmd
 }
 
-//RunVolumeDelete will initiate the process of deleting a volume from maya-apiserver
-func (c *CmdVolumeOptions) RunVolumeDelete(cmd *cobra.Command) error {
+//ValidateVolumeDelete validates the arguments passed
+func (c *CmdVolumeDeleteOptions) ValidateVolumeDelete(cmd *cobra.Command) error {
+	if c.volName == "" {
+		return errors.New("--volname is missing. Please specify an unique name")
+	}
+	return nil
+}
+
+//RunVolumeDelete will initiate deletion of volume from maya-apiserver
+func (c *CmdVolumeDeleteOptions) RunVolumeDelete(cmd *cobra.Command) error {
 	fmt.Println("Executing volume delete...")
 
-	resp := mapiserver.DeleteVolume(c.volName, c.namespace)
+	resp := mapiserver.DeleteVolume(c.volName)
 	if resp != nil {
-		return fmt.Errorf("Volume deletion failed: %v", resp)
+		return fmt.Errorf("Error: %v", resp)
 	}
 
 	fmt.Printf("Volume deletion initiated:%v\n", c.volName)

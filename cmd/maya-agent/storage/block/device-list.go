@@ -19,7 +19,11 @@ func ListBlockExec(resJsonDecoded *v1.BlockDeviceInfo) error {
 	}
 
 	//decode the json output
-	return json.Unmarshal(res, &resJsonDecoded)
+	err = json.Unmarshal(res, &resJsonDecoded)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //FormatOutputForUser is to print disk details to end user only with necessary fields

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,12 +24,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CASTemplates returns a CASTemplateInformer.
-	CASTemplates() CASTemplateInformer
-	// CStorPools returns a CStorPoolInformer.
-	CStorPools() CStorPoolInformer
-	// CStorVolumeReplicas returns a CStorVolumeReplicaInformer.
-	CStorVolumeReplicas() CStorVolumeReplicaInformer
 	// StoragePools returns a StoragePoolInformer.
 	StoragePools() StoragePoolInformer
 	// StoragePoolClaims returns a StoragePoolClaimInformer.
@@ -43,21 +37,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &version{f}
-}
-
-// CASTemplates returns a CASTemplateInformer.
-func (v *version) CASTemplates() CASTemplateInformer {
-	return &cASTemplateInformer{factory: v.SharedInformerFactory}
-}
-
-// CStorPools returns a CStorPoolInformer.
-func (v *version) CStorPools() CStorPoolInformer {
-	return &cStorPoolInformer{factory: v.SharedInformerFactory}
-}
-
-// CStorVolumeReplicas returns a CStorVolumeReplicaInformer.
-func (v *version) CStorVolumeReplicas() CStorVolumeReplicaInformer {
-	return &cStorVolumeReplicaInformer{factory: v.SharedInformerFactory}
 }
 
 // StoragePools returns a StoragePoolInformer.

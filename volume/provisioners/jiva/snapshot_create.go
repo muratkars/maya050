@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/openebs/maya/command"
 	"github.com/openebs/maya/pkg/client/jiva"
 )
 
@@ -23,7 +24,7 @@ func Snapshot(snapname string, controllerIP string, labels map[string]string) (c
 	output := client.SnapshotOutput{}
 	var c ControllerClient
 
-	controller, err := client.NewControllerClient(controllerIP + ":9501")
+	controller, err := command.NewControllerClient(controllerIP + ":9501")
 
 	if err != nil {
 		return output, err
@@ -41,13 +42,12 @@ func Snapshot(snapname string, controllerIP string, labels map[string]string) (c
 		Labels: labels,
 	}
 
-	err = CheckSnapshotExist(snapname, controllerIP)
+	err = c.post(url, input, &output)
 	if err != nil {
 		return output, err
-
 	}
-	err = c.post(url, input, &output)
-	return output, err
+
+	return output, nil
 }
 
 func (c *ControllerClient) post(path string, req, resp interface{}) error {

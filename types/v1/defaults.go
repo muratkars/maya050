@@ -64,9 +64,6 @@ const (
 	// DefaultMonitoringImage contains the default image for
 	// volume monitoring
 	DefaultMonitoringImage string = "openebs/m-exporter:latest"
-
-	// DefaultNamespaceForListOps contains the default
-	DefaultNamespaceForListOps string = "all-namespaces"
 )
 
 var (

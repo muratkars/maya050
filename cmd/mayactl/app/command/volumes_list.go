@@ -27,18 +27,25 @@ import (
 
 var (
 	volumesListCommandHelpText = `
-This command displays status of available Volumes.
-If no volume ID is given, a list of all known volumes will be displayed.
+	Usage: maya volume list [options]
 
-Usage: mayactl volume list [options]
+	This command displays status of available Volumes.
+	If no volume ID is given, a list of all known volume will be dumped.
 	`
 )
 
-// NewCmdVolumesList displays status of OpenEBS Volume(s)
+// CmdVolumesListOptions captures the CLI flags
+type CmdVolumesListOptions struct {
+	volName string
+}
+
+// NewCmdVolumesList display status of OpenEBS Volume(s)
 func NewCmdVolumesList() *cobra.Command {
+	options := CmdVolumesListOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Displays status information about Volume(s)",
+		Short: "Display status information about Volume(s)",
 		Long:  volumesListCommandHelpText,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(options.RunVolumesList(cmd), util.Fatal)
@@ -52,8 +59,8 @@ func NewCmdVolumesList() *cobra.Command {
 	return cmd
 }
 
-//RunVolumesList fetchs the volumes from maya-apiserver
-func (c *CmdVolumeOptions) RunVolumesList(cmd *cobra.Command) error {
+//RunVolumesList will fetch the volumes from maya-apiserver
+func (c *CmdVolumesListOptions) RunVolumesList(cmd *cobra.Command) error {
 	//fmt.Println("Executing volume list...")
 
 	var vsms mtypesv1.VolumeList

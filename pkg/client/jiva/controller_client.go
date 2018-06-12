@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/openebs/maya/pkg/util"
 )
 
 // NewControllerClient create the new controller client
@@ -36,10 +34,15 @@ func NewControllerClient(address string) (*ControllerClient, error) {
 		return nil, fmt.Errorf("Invalid address %s, must have a port in it", address)
 	}
 
+	timeout := time.Duration(2 * time.Second)
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
 	return &ControllerClient{
 		Host:       parts[0],
 		Address:    address,
-		httpClient: &http.Client{Timeout: 2 * time.Second},
+		httpClient: client,
 	}, nil
 }
 
@@ -109,40 +112,10 @@ func (c *ControllerClient) Get(path string, obj interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(obj)
 }
 
-// ListReplicas to get the details of all the existing replicas
-// which contains address and mode of those replicas (RW/R/W) as well as
-// resource information.
 func (c *ControllerClient) ListReplicas(path string) ([]Replica, error) {
 	var resp ReplicaCollection
 
 	err := c.Get(path+"/replicas", &resp)
 
 	return resp.Data, err
-}
-
-// GetVolumeStats is used to get the status of volume controller.It is used to
-// get the response in json format and then the response is then decoded to the
-// desired structure.
-func (c *ControllerClient) GetVolumeStats(address string, api string, obj interface{}) (int, error) {
-	controller, err := NewControllerClient(address)
-	if err != nil {
-		return -1, err
-	}
-	url := controller.Address + api
-	resp, err := controller.httpClient.Get(url)
-	if resp != nil {
-		if resp.StatusCode == 500 {
-			return 500, util.InternalServerError
-		} else if resp.StatusCode == 503 {
-			return 503, util.ServerUnavailable
-		}
-	} else {
-		return -1, util.ServerNotReachable
-	}
-	if err != nil {
-		return -1, err
-	}
-	defer resp.Body.Close()
-	rc := json.NewDecoder(resp.Body).Decode(obj)
-	return 0, rc
 }

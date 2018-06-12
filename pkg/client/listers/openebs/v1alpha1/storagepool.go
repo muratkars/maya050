@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The OpenEBS Authors
+Copyright 2017 The OpenEBS Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ import (
 type StoragePoolLister interface {
 	// List lists all StoragePools in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.StoragePool, err error)
-	// Get retrieves the StoragePool from the index for a given name.
-	Get(name string) (*v1alpha1.StoragePool, error)
+	// StoragePools returns an object that can list and get StoragePools.
+	StoragePools(namespace string) StoragePoolNamespaceLister
 	StoragePoolListerExpansion
 }
 
@@ -52,9 +52,38 @@ func (s *storagePoolLister) List(selector labels.Selector) (ret []*v1alpha1.Stor
 	return ret, err
 }
 
-// Get retrieves the StoragePool from the index for a given name.
-func (s *storagePoolLister) Get(name string) (*v1alpha1.StoragePool, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
+// StoragePools returns an object that can list and get StoragePools.
+func (s *storagePoolLister) StoragePools(namespace string) StoragePoolNamespaceLister {
+	return storagePoolNamespaceLister{indexer: s.indexer, namespace: namespace}
+}
+
+// StoragePoolNamespaceLister helps list and get StoragePools.
+type StoragePoolNamespaceLister interface {
+	// List lists all StoragePools in the indexer for a given namespace.
+	List(selector labels.Selector) (ret []*v1alpha1.StoragePool, err error)
+	// Get retrieves the StoragePool from the indexer for a given namespace and name.
+	Get(name string) (*v1alpha1.StoragePool, error)
+	StoragePoolNamespaceListerExpansion
+}
+
+// storagePoolNamespaceLister implements the StoragePoolNamespaceLister
+// interface.
+type storagePoolNamespaceLister struct {
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all StoragePools in the indexer for a given namespace.
+func (s storagePoolNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.StoragePool, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.StoragePool))
+	})
+	return ret, err
+}
+
+// Get retrieves the StoragePool from the indexer for a given namespace and name.
+func (s storagePoolNamespaceLister) Get(name string) (*v1alpha1.StoragePool, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}

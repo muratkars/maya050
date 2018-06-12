@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/openebs/maya/pkg/util"
 )
 
 const (
@@ -13,11 +11,11 @@ const (
 )
 
 // DeleteVolume will request maya-apiserver to delete volume (vname)
-func DeleteVolume(vname string, namespace string) error {
+func DeleteVolume(vname string) error {
 
 	_, err := GetStatus()
 	if err != nil {
-		return util.MAPIADDRNotSet
+		return fmt.Errorf("Unable to contact maya-apiserver: %s", GetURL())
 	}
 
 	url := GetURL() + "/latest/volumes/delete/" + vname
@@ -25,8 +23,6 @@ func DeleteVolume(vname string, namespace string) error {
 	if err != nil {
 		return err
 	}
-
-	req.Header.Set("namespace", namespace)
 	c := &http.Client{
 		Timeout: timeoutVolumeDelete,
 	}
@@ -36,9 +32,10 @@ func DeleteVolume(vname string, namespace string) error {
 	}
 
 	defer resp.Body.Close()
+
 	code := resp.StatusCode
 	if code != http.StatusOK {
-		return fmt.Errorf("Status error: %v ", http.StatusText(code))
+		return fmt.Errorf("Status error: %v", http.StatusText(code))
 	}
 	return nil
 }

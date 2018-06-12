@@ -6,33 +6,22 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/openebs/maya/pkg/util"
 	"github.com/openebs/maya/types/v1"
 	policies_v1 "github.com/openebs/maya/volume/policies/v1"
 	"github.com/openebs/maya/volume/provisioners"
 )
 
-const (
-	// NamespaceKey is used in request headers to get the
-	// namespace
-	NamespaceKey string = "namespace"
-)
-
 // VolumeSpecificRequest is a http handler implementation. It deals with HTTP
 // requests w.r.t a single Volume.
+//
+// TODO
+//    Should it return specific types than interface{} ?
 func (s *HTTPServer) volumeSpecificRequest(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
-	glog.Infof("received volume request: method '%s'", req.Method)
+
+	fmt.Println("[DEBUG] Processing", req.Method, "request")
 
 	switch req.Method {
 	case "PUT", "POST":
-		// check the feature gate & switch if enabled
-		//
-		// NOTE:
-		//  feature gate is enabled/disabled for volume create request only
-		if util.CASTemplateFeatureGate() {
-			return s.volumeV1alpha1SpecificRequest(resp, req)
-		}
-
 		return s.volumeAdd(resp, req)
 	case "GET":
 		return s.volumeSpecificGetRequest(resp, req)
@@ -71,23 +60,8 @@ func (s *HTTPServer) volumeList(resp http.ResponseWriter, req *http.Request) (in
 
 	glog.Infof("Processing Volume list request")
 
-	// Get the namespace if provided
-	ns := ""
-	if req != nil {
-		ns = req.Header.Get(NamespaceKey)
-	}
-
-	if ns == "" {
-		// We shall override if empty. This seems to be simple enough
-		// that works for most of the usecases.
-		// Otherwise we need to introduce logic to decide for default
-		// namespace depending on operation type.
-		ns = v1.DefaultNamespaceForListOps
-	}
-
 	// Create a Volume
 	vol := &v1.Volume{}
-	vol.Namespace = ns
 
 	// Pass through the policy enforcement logic
 	policy, err := policies_v1.VolumeGenericPolicy()
@@ -140,16 +114,9 @@ func (s *HTTPServer) volumeRead(resp http.ResponseWriter, req *http.Request, vol
 		return nil, CodedError(400, fmt.Sprintf("Volume name is missing"))
 	}
 
-	// Get the namespace if provided
-	ns := ""
-	if req != nil {
-		ns = req.Header.Get(NamespaceKey)
-	}
-
 	// Create a Volume
 	vol := &v1.Volume{}
 	vol.Name = volName
-	vol.Namespace = ns
 
 	// Pass through the policy enforcement logic
 	policy, err := policies_v1.VolumeGenericPolicy()
@@ -204,16 +171,9 @@ func (s *HTTPServer) volumeDelete(resp http.ResponseWriter, req *http.Request, v
 		return nil, CodedError(400, fmt.Sprintf("Volume name is missing"))
 	}
 
-	// Get the namespace if provided
-	ns := ""
-	if req != nil {
-		ns = req.Header.Get(NamespaceKey)
-	}
-
 	// Create a Volume
 	vol := &v1.Volume{}
 	vol.Name = volName
-	vol.Namespace = ns
 
 	// Pass through the policy enforcement logic
 	policy, err := policies_v1.VolumeGenericPolicy()

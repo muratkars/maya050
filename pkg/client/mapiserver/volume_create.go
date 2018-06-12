@@ -2,12 +2,12 @@ package mapiserver
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"github.com/openebs/maya/pkg/util"
 	"github.com/openebs/maya/types/v1"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -21,7 +21,8 @@ func CreateVolume(vname string, size string) error {
 
 	_, err := GetStatus()
 	if err != nil {
-		return util.MAPIADDRNotSet
+		err := errors.New(fmt.Sprintf("Unable to contact maya-apiserver: %s", GetURL()))
+		return err
 	}
 
 	var vs v1.VolumeAPISpec
@@ -60,7 +61,8 @@ func CreateVolume(vname string, size string) error {
 	code := resp.StatusCode
 
 	if code != http.StatusOK {
-		return fmt.Errorf("Status error: %v", http.StatusText(code))
+		err := errors.New(fmt.Sprintf("Status error: %v", http.StatusText(code)))
+		return err
 	}
 	return nil
 }

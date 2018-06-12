@@ -1,5 +1,5 @@
 # list only our namespaced directories
-PACKAGES = $(shell go list ./... | grep -v 'vendor\|pkg/apis\|pkg/client/clientset\|pkg/client/listers\|pkg/client/informers')
+PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 # Lint our code. Reference: https://golang.org/cmd/vet/
 VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods \
@@ -18,22 +18,22 @@ EXTERNAL_TOOLS=\
 GOFILES_NOVENDOR = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 # Specify the name for the binaries
-MAYACTL=mayactl
+MAYACTL=maya
 APISERVER=maya-apiserver
 AGENT=maya-agent
-EXPORTER=maya-exporter
+EXPORTER=maya-volume-exporter
 
 # Specify the date o build
 BUILD_DATE = $(shell date +'%Y%m%d%H%M%S')
 
-all: mayactl apiserver-image exporter-image maya-agent
+all: test mayactl apiserver-image exporter-image maya-agent
 
 dev: format
 	@MAYACTL=${MAYACTL} MAYA_DEV=1 sh -c "'$(PWD)/buildscripts/mayactl/build.sh'"
 
 mayactl:
 	@echo "----------------------------"
-	@echo "--> mayactl                    "
+	@echo "--> maya                    "
 	@echo "----------------------------"
 	@MAYACTL=${MAYACTL} sh -c "'$(PWD)/buildscripts/mayactl/build.sh'"
 
@@ -96,7 +96,7 @@ vet:
 bootstrap:
 	@for tool in  $(EXTERNAL_TOOLS) ; do \
 		echo "Installing $$tool" ; \
-		go get -u $$tool; \
+		go get $$tool; \
 	done
 
 maya-image:
@@ -126,10 +126,10 @@ agent-image: maya-agent
 	@rm buildscripts/agent/${AGENT}
 	@sh buildscripts/agent/push
 
-# Use this to build only the maya-exporter.
+# Use this to build only the maya-volume-exporter.
 exporter:
 	@echo "----------------------------"
-	@echo "--> maya-exporter              "
+	@echo "--> maya-volume-exporter              "
 	@echo "----------------------------"
 	@CTLNAME=${EXPORTER} sh -c "'$(PWD)/buildscripts/exporter/build.sh'"
 
@@ -163,4 +163,4 @@ apiserver-image: mayactl apiserver
 	@rm buildscripts/apiserver/${MAYACTL}
 	@sh buildscripts/apiserver/push
 
-.PHONY: all bin cov integ test vet maya-agent test-nodep apiserver image apiserver-image maya-image golint
+.PHONY: all bin cov integ test vet maya-agent test-nodep apiserver apiserver-image maya-image golint
